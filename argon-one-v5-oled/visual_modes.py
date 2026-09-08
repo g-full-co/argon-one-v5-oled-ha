@@ -202,7 +202,7 @@ class VisualModeRenderer:
             draw.text((64, 15), fact.get('title', 'NOW'), font=self.font_medium, fill=255, anchor='mm')
             draw.line((18, 27, 110, 27), fill=255)
             draw.text((64, 44), fact.get('detail', ''), font=self.font_small, fill=255, anchor='mm')
-            draw.text((64, 58), '•', font=self.font_small, fill=255, anchor='mm')
+            draw.text((64, 58), 'â¢', font=self.font_small, fill=255, anchor='mm')
 
     def draw_character(self, context, frame=0, fault=None, fact=None, cpu_temp_c=None):
         context = context or {'available': False}
@@ -210,7 +210,7 @@ class VisualModeRenderer:
         label = (fault or fact or {}).get('title')
 
         with canvas(self.device) as draw:
-            draw.rounded_rectangle((29, 7, 98, 55), radius=15, outline=255)
+            self._draw_corner_brackets(draw, 29, 7, 98, 55, arm=7)
             self._draw_character_face(draw, mood, frame)
             if label:
                 text = label[:18]
@@ -245,60 +245,83 @@ class VisualModeRenderer:
         return 'calm'
 
     def _draw_character_face(self, draw, mood, frame):
+        """No face -- one Lamp mark carries mood via fill/size/blink, joined
+        by one Functional Mark for faults. Per JARVIS Design System MK.I
+        RevB s06 (marks at 0/45/90, circles as lamp forms) and s15
+        (no personhood, no avatar, no face, no idle animation implying
+        thought)."""
+        cx, cy = 63, 30
+
         if mood == 'sleeping':
-            draw.line((44, 29, 54, 29), fill=255)
-            draw.line((73, 29, 83, 29), fill=255)
-            draw.arc((53, 34, 74, 48), 0, 180, fill=255)
-            draw.text((92, 13), 'z', font=self.font_small, fill=255)
-            draw.text((102, 5), 'z', font=self.font_small, fill=255)
+            # small, dim, slow breathing -- "instrument at rest," not asleep
+            self._draw_lamp(draw, cx, cy, r=7, lit=False, dim_tick=(frame // 10) % 2 == 0)
             return
 
         if mood == 'confused':
-            draw.ellipse((44, 24, 50, 30), outline=255)
-            draw.ellipse((75, 22, 81, 28), outline=255)
-            draw.line((56, 43, 63, 40, 70, 44), fill=255)
-            draw.text((100, 10), '?', font=self.font_medium, fill=255)
+            # HA unreachable: the lamp itself is uncertain -- flicker
+            lit = (frame % 5) < 3
+            self._draw_lamp(draw, cx, cy, r=11, lit=lit)
+            self._draw_offline_mark(draw, cx + 26, cy - 14)
             return
 
-        if mood == 'annoyed':
-            draw.line((42, 25, 53, 29), fill=255)
-            draw.line((74, 29, 85, 25), fill=255)
-            draw.rectangle((47, 31, 50, 34), fill=255)
-            draw.rectangle((77, 31, 80, 34), fill=255)
-            draw.line((55, 46, 72, 43), fill=255)
-            draw.text((101, 9), '!', font=self.font_medium, fill=255)
-            return
-
-        if mood == 'hot':
-            draw.ellipse((45, 26, 50, 31), fill=255)
-            draw.ellipse((77, 26, 82, 31), fill=255)
-            draw.ellipse((57, 39, 70, 49), outline=255)
-            drop = 1 + (frame // 3) % 3
-            draw.line((103, 18, 100, 23 + drop), fill=255)
-            draw.ellipse((98, 22 + drop, 102, 27 + drop), outline=255)
-            return
-
-        if mood == 'umbrella':
-            draw.ellipse((45, 27, 50, 32), fill=255)
-            draw.ellipse((77, 27, 82, 32), fill=255)
-            draw.arc((54, 36, 73, 48), 180, 360, fill=255)
-            draw.arc((88, 7, 119, 28), 180, 360, fill=255)
-            draw.line((103, 18, 103, 36), fill=255)
-            draw.arc((97, 31, 104, 39), 270, 90, fill=255)
+        if mood in ('annoyed', 'hot'):
+            self._draw_lamp(draw, cx, cy, r=11, lit=True)
+            self._draw_caution_mark(draw, cx + 26, cy - 14)
             return
 
         if mood == 'excited':
-            eye_h = 2 + (frame % 2)
-            draw.rectangle((44, 25, 50, 25 + eye_h), fill=255)
-            draw.rectangle((77, 25, 83, 25 + eye_h), fill=255)
-            draw.arc((51, 32, 76, 50), 0, 180, fill=255)
-            draw.text((14, 14), '*', font=self.font_small, fill=255)
-            draw.text((108, 18), '*', font=self.font_small, fill=255)
+            pulse = frame % 8
+            r = 14 if pulse < 4 else 11
+            self._draw_lamp(draw, cx, cy, r=r, lit=True)
+            if pulse < 4:
+                self._draw_burst(draw, cx, cy, r + 5)
             return
 
-        draw.ellipse((45, 27, 50, 32), fill=255)
-        draw.ellipse((77, 27, 82, 32), fill=255)
-        if mood == 'happy':
-            draw.arc((52, 33, 75, 48), 0, 180, fill=255)
+        # happy, umbrella, calm
+        self._draw_lamp(draw, cx, cy, r=11, lit=(mood in ('happy', 'umbrella')))
+
+    @staticmethod
+    def _draw_corner_brackets(draw, x0, y0, x1, y1, arm=7):
+        """Viewfinder framing per s05 Housing ornament, in place of a
+        rounded-rectangle plate -- ornament stays fixed, achromatic and
+        orthogonal rather than a soft pill."""
+        for cx, cy, dx, dy in ((x0, y0, 1, 1), (x1, y0, -1, 1), (x0, y1, 1, -1), (x1, y1, -1, -1)):
+            draw.line((cx, cy, cx + dx * arm, cy), fill=255)
+            draw.line((cx, cy, cx, cy + dy * arm), fill=255)
+
+    @staticmethod
+    def _draw_lamp(draw, cx, cy, r, lit, dim_tick=False):
+        """The Lamp / Lamp lit mark -- s06 Functional marks."""
+        bbox = (cx - r, cy - r, cx + r, cy + r)
+        if lit:
+            draw.ellipse(bbox, fill=255)
         else:
-            draw.line((57, 43, 70, 43), fill=255)
+            draw.ellipse(bbox, outline=255)
+            if dim_tick:
+                draw.point((cx, cy), fill=255)
+
+    @staticmethod
+    def _draw_burst(draw, cx, cy, r):
+        """Radiating ticks at the 8 compass points -- 0/45/90 multiples only."""
+        for angle in (0, 45, 90, 135, 180, 225, 270, 315):
+            rad = math.radians(angle)
+            x0 = cx + int((r - 3) * math.cos(rad))
+            y0 = cy + int((r - 3) * math.sin(rad))
+            x1 = cx + int(r * math.cos(rad))
+            y1 = cy + int(r * math.sin(rad))
+            draw.line((x0, y0, x1, y1), fill=255)
+
+    @staticmethod
+    def _draw_caution_mark(draw, x, y):
+        """The Caution mark -- s06 Functional marks."""
+        draw.line((x, y + 10, x + 6, y - 2, x + 12, y + 10), fill=255)
+        draw.line((x, y + 10, x + 12, y + 10), fill=255)
+        draw.line((x + 6, y + 2, x + 6, y + 6), fill=255)
+        draw.point((x + 6, y + 8), fill=255)
+
+    @staticmethod
+    def _draw_offline_mark(draw, x, y):
+        """The Offline mark -- s06 Functional marks."""
+        draw.line((x, y + 4, x + 8, y + 4, x + 5, y + 1), fill=255)
+        draw.line((x + 12, y + 10, x + 4, y + 10, x + 7, y + 13), fill=255)
+        draw.line((x, y + 12, x + 12, y), fill=255)
