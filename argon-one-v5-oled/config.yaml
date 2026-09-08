@@ -1,7 +1,7 @@
 name: Argon ONE OLED Display
-version: 2.2.0
+version: 2.2.0-jarvis1
 slug: argon_one_oled_display
-description: Living system status, ambient art, and home character for the Argon ONE Industria 128x64 OLED (Raspberry Pi 5)
+description: Living system status, ambient art, and home character for the Argon ONE Industria 128x64 OLED (Raspberry Pi 5) -- reskinned per JARVIS Design System MK.I RevB
 url: https://github.com/LPeberdy/argon-one-v5-oled-ha
 arch:
   - aarch64
@@ -16,22 +16,22 @@ apparmor: true
 devices:
   - /dev/i2c-1
 options:
-  mode: current
+  mode: character
   ambient_scene: auto
   contextual_interruptions: true
   urgent_interruptions: true
   contextual_duration: 8
   contextual_interval: 300
   ha_refresh_seconds: 60
-  temp_unit: C
+  temp_unit: F
   switch_duration: 30
   screen_list: "clock hastatus cpu fan ram storage ip uptime"
   debug_logging: false
   show_credits: true
-  cpu_temp_alert_c: 80
+  cpu_temp_alert_c: 75
   fan_min_temp_c: 55
   backup_max_age_hours: 48
-  storage_min_free_percent: 10
+  storage_min_free_percent: 15
 schema:
   mode: list(current|ambient|character)
   ambient_scene: list(auto|landscape|stars|weather|waves|city|plant|particles)
